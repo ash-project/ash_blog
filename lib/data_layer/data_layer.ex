@@ -14,11 +14,45 @@ defmodule AshBlog.DataLayer do
     ],
     links: [],
     schema: [
+      file_namer: [
+        type: :mfa,
+        default: {AshBlog.FileNamer, :name_file, []},
+        doc: """
+        An MFA that will take a changeset and produce a file name.
+        The default one looks for a title or name, and appends it to `YYYY/YYYY-MM-DD-\#\{dasherized_name\}.md`.
+        The date uses the time that the file name was generated record.
+        """
+      ],
+      title_attribute: [
+        type: :atom,
+        default: :title,
+        doc:
+          "The attribute name to use for the title of the blog post. Will be created if it doesn't exist."
+      ],
+      created_at_attribute: [
+        type: :atom,
+        default: :created_at,
+        doc:
+          "The attribute name to use for the created_at timestamp of the blog post. Will be created if it doesn't exist."
+      ],
+      body_attribute: [
+        type: :atom,
+        default: :body,
+        doc:
+          "The attribute name to use for the body of the post. Wil be created if it doesn't exist."
+      ],
       folder: [
         type: :string,
         default: "static/blog",
         doc: """
         A path relative to to the priv directory where the files should be placed.
+        """
+      ],
+      staging_folder: [
+        type: :string,
+        default: "static/blog",
+        doc: """
+        A path relative to to the priv directory where the files should be placed when they are staged.
         """
       ]
     ]
@@ -43,7 +77,7 @@ defmodule AshBlog.DataLayer do
 
   use Spark.Dsl.Extension,
     sections: [@blog],
-    transformers: [Ash.DataLayer.Transformers.RequirePreCheckWith]
+    transformers: [AshBlog.DataLayer.Transformers.AddStructure]
 
   alias Ash.Actions.Sort
 
@@ -54,10 +88,8 @@ defmodule AshBlog.DataLayer do
       :filter,
       :limit,
       :sort,
-      :tenant,
       :api,
       calculations: [],
-      aggregates: [],
       relationships: %{},
       offset: 0
     ]
@@ -70,17 +102,12 @@ defmodule AshBlog.DataLayer do
   def can?(_, :composite_primary_key), do: true
   def can?(_, :expression_calculation), do: true
   def can?(_, :expression_calculation_sort), do: true
-  def can?(_, :multitenancy), do: true
-  def can?(_, :upsert), do: true
-  def can?(_, :aggregate_filter), do: true
-  def can?(_, :aggregate_sort), do: true
-  def can?(_, {:aggregate_relationship, _}), do: true
   def can?(_, {:filter_relationship, _}), do: true
-  def can?(_, {:aggregate, :count}), do: true
   def can?(_, :create), do: true
   def can?(_, :read), do: true
   def can?(_, :update), do: true
-  def can?(_, :destroy), do: true
+  # Destroy is not implemented yet, because I didn't need it
+  def can?(_, :destroy), do: false
   def can?(_, :sort), do: true
   def can?(_, :filter), do: true
   def can?(_, :limit), do: true
@@ -119,12 +146,6 @@ defmodule AshBlog.DataLayer do
   @impl true
   def add_aggregate(query, aggregate, _),
     do: {:ok, %{query | aggregates: [aggregate | query.aggregates]}}
-
-  @doc false
-  @impl true
-  def set_tenant(_resource, query, tenant) do
-    {:ok, %{query | tenant: tenant}}
-  end
 
   @doc false
   @impl true
@@ -184,15 +205,12 @@ defmodule AshBlog.DataLayer do
           offset: offset,
           limit: limit,
           sort: sort,
-          tenant: tenant,
           calculations: calculations,
-          aggregates: aggregates,
           api: api
         },
         _resource
       ) do
-    with {:ok, records} <- get_records(resource, tenant),
-         {:ok, records} <- do_add_aggregates(records, api, resource, aggregates),
+    with {:ok, records} <- get_records(resource),
          {:ok, records} <-
            filter_matches(records, filter, api),
          {:ok, records} <-
@@ -269,61 +287,57 @@ defmodule AshBlog.DataLayer do
     end
   end
 
-  defp do_add_aggregates(records, _api, _resource, []), do: {:ok, records}
+  defp get_records(resource) do
+    published =
+      resource
+      |> AshBlog.DataLayer.Info.folder()
+      |> all_files(resource)
 
-  defp do_add_aggregates(records, api, _resource, aggregates) do
-    # TODO support crossing apis by getting the destination api, and set destination query context.
-    Enum.reduce_while(records, {:ok, []}, fn record, {:ok, records} ->
-      aggregates
-      |> Enum.reduce_while({:ok, record}, fn %{
-                                               kind: :count,
-                                               relationship_path: relationship_path,
-                                               query: query,
-                                               authorization_filter: authorization_filter,
-                                               name: name,
-                                               load: load
-                                             },
-                                             {:ok, record} ->
-        query =
-          if authorization_filter do
-            Ash.Query.do_filter(query, authorization_filter)
-          else
-            query
+    staged =
+      resource
+      |> AshBlog.DataLayer.Info.staging_folder()
+      |> all_files(resource)
+
+    archived =
+      resource
+      |> AshBlog.DataLayer.Info.archive_folder()
+      |> all_files(resource)
+
+    [published, staged, archived]
+    |> Stream.concat()
+    |> Enum.reduce_while({:ok, []}, fn file, {:ok, results} ->
+      contents = File.read!(file)
+
+      [data, body] =
+        contents
+        |> String.split("---", trim: true)
+        |> Enum.map(&String.trim/1)
+
+      case YamlElixir.read_all_from_string(data, one_result: true) do
+        {:ok, result} ->
+          attrs =
+            resource
+            |> Ash.Resource.Info.attributes()
+            |> Map.new(fn attr ->
+              {attr.name, Map.get(result, to_string(attr.name))}
+            end)
+            |> Map.put(AshBlog.DataLayer.Info.body_attribute(resource), body)
+
+          resource
+          |> struct(attrs)
+          |> cast_record(resource)
+          |> case do
+            {:ok, record} ->
+              {:cont, {:ok, [Ash.Resource.put_metadata(record, :ash_blog_file, file) | results]}}
+
+            {:error, error} ->
+              {:error, error}
           end
-
-        with {:ok, loaded_record} <- api.load(record, relationship_path),
-             related <- Ash.Filter.Runtime.get_related(loaded_record, relationship_path),
-             {:ok, filtered} <-
-               filter_matches(related, query.filter, api) do
-          {:cont, {:ok, Map.put(record, load || name, Enum.count(filtered))}}
-        else
-          other ->
-            {:halt, other}
-        end
-      end)
-      |> case do
-        {:ok, record} ->
-          {:cont, {:ok, [record | records]}}
 
         {:error, error} ->
           {:halt, {:error, error}}
       end
     end)
-    |> case do
-      {:ok, records} ->
-        {:ok, Enum.reverse(records)}
-
-      {:error, error} ->
-        {:error, Ash.Error.to_ash_error(error)}
-    end
-  end
-
-  defp get_records(resource, tenant) do
-    with {:ok, table} <- wrap_or_create_table(resource, tenant),
-         {:ok, record_tuples} <- ETS.Set.to_list(table),
-         records <- Enum.map(record_tuples, &elem(&1, 1)) do
-      cast_records(records, resource)
-    end
   end
 
   @doc false
@@ -373,14 +387,22 @@ defmodule AshBlog.DataLayer do
     |> case do
       {:ok, attrs} ->
         {:ok,
-         %{
-           struct(resource, attrs)
-           | __meta__: %Ecto.Schema.Metadata{state: :loaded, schema: resource}
-         }}
+         Ash.Resource.set_meta(struct(resource, attrs), %Ecto.Schema.Metadata{
+           state: :loaded,
+           schema: resource
+         })}
 
       {:error, error} ->
         {:error, error}
     end
+  end
+
+  defp expand_path(folder, resource) do
+    Path.join([priv_dir(resource), folder])
+  end
+
+  defp all_files(folder, resource) do
+    Path.wildcard(Path.join([expand_path(folder, resource), "**", "*.md"]))
   end
 
   defp filter_matches(records, nil, _api), do: {:ok, records}
@@ -391,64 +413,126 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
-  def upsert(resource, changeset, keys) do
-    keys = keys || Ash.Resource.Info.primary_key(resource)
+  def create(resource, changeset) do
+    file_name = file_name(resource, changeset)
 
-    if Enum.any?(keys, &is_nil(Ash.Changeset.get_attribute(changeset, &1))) do
-      create(resource, changeset)
-    else
-      key_filters =
-        Enum.map(keys, fn key ->
-          {key, Ash.Changeset.get_attribute(changeset, key)}
-        end)
-
-      query = Ash.Query.do_filter(resource, and: [key_filters])
-
+    file_path =
       resource
-      |> resource_to_query(changeset.api)
-      |> Map.put(:filter, query.filter)
-      |> Map.put(:tenant, changeset.tenant)
-      |> run_query(resource)
-      |> case do
-        {:ok, []} ->
-          create(resource, changeset)
+      |> priv_dir()
+      |> Path.join(folder(resource, Ash.Changeset.get_attribute(changeset, :state)))
+      |> Path.join(file_name)
 
-        {:ok, [result]} ->
-          to_set = Ash.Changeset.set_on_upsert(changeset, keys)
+    with {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
+         record <-
+           Ash.Resource.set_meta(record, %Ecto.Schema.Metadata{state: :loaded, schema: resource}),
+         {:ok, yaml} <- yaml_frontmatter(record) do
+      File.mkdir_p!(Path.dirname(file_path))
 
-          changeset =
-            changeset
-            |> Map.put(:attributes, %{})
-            |> Map.put(:data, result)
-            |> Ash.Changeset.force_change_attributes(to_set)
+      File.write!(
+        file_path,
+        """
+        ---
+        #{yaml}
+        ---
+        #{Map.get(record, AshBlog.DataLayer.Info.body_attribute(resource))}
+        """
+      )
 
-          update(resource, changeset)
-
-        {:ok, _} ->
-          {:error, "Multiple records matching keys"}
-      end
+      {:ok, Ash.Resource.put_metadata(record, :ash_blog_file, file_path)}
     end
   end
 
-  @doc false
-  @impl true
-  def create(resource, changeset) do
-    pkey =
-      resource
-      |> Ash.Resource.Info.primary_key()
-      |> Enum.into(%{}, fn attr ->
-        {attr, Ash.Changeset.get_attribute(changeset, attr)}
-      end)
+  defp folder(resource, :staged) do
+    AshBlog.DataLayer.Info.staging_folder(resource)
+  end
 
-    with {:ok, table} <- wrap_or_create_table(resource, changeset.tenant),
-         {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
-         record <- unload_relationships(resource, record),
-         {:ok, record} <-
-           put_or_insert_new(table, {pkey, record}, resource) do
-      {:ok, %{record | __meta__: %Ecto.Schema.Metadata{state: :loaded, schema: resource}}}
-    else
-      {:error, error} -> {:error, Ash.Error.to_ash_error(error)}
+  defp folder(resource, :published) do
+    AshBlog.DataLayer.Info.folder(resource)
+  end
+
+  defp folder(resource, :archived) do
+    AshBlog.DataLayer.Info.archive_folder(resource)
+  end
+
+  defp yaml_frontmatter(%resource{} = record) do
+    body_attribute = AshBlog.DataLayer.Info.body_attribute(resource)
+
+    resource
+    |> Ash.Resource.Info.attributes()
+    |> Enum.reject(&(&1.name == body_attribute))
+    |> Enum.reduce_while({:ok, []}, fn attr, {:ok, acc} ->
+      if Ash.Type.storage_type(attr.type) in [
+           :string,
+           :integer,
+           :uuid,
+           :utc_datetime,
+           :utc_datetime_usec
+         ] do
+        case Ash.Type.dump_to_embedded(attr.type, Map.get(record, attr.name), attr.constraints) do
+          {:ok, value} ->
+            {:cont, {:ok, [{attr.name, value} | acc]}}
+
+          {:error, error} ->
+            {:halt, {:error, error}}
+        end
+      else
+        {:halt, {:error, "#{inspect(attr.type)} is not yet supported by `AshBlog.DataLayer`"}}
+      end
+    end)
+    |> case do
+      {:ok, attrs} ->
+        {:ok,
+         attrs
+         |> Enum.reverse()
+         |> Enum.map_join("\n", fn {name, value} ->
+           case value do
+             value when is_binary(value) ->
+               "#{name}: '#{escape_string(value)}'"
+
+             %DateTime{} = value ->
+               "#{name}: '#{escape_string(value)}'"
+
+             other ->
+               "#{name}: #{other}"
+           end
+         end)}
+
+      {:error, error} ->
+        {:error, error}
     end
+  end
+
+  defp escape_string(value) do
+    value
+    |> to_string()
+    |> String.replace("'", "\\'")
+  end
+
+  case Code.ensure_compiled(Mix) do
+    {:module, _} ->
+      def priv_dir(resource) do
+        _ = otp_app!(resource)
+        Path.join(File.cwd!(), "priv")
+      end
+
+    _ ->
+      def priv_dir(resource) do
+        :code.priv_dir(otp_app!(resource))
+      end
+  end
+
+  defp otp_app!(resource) do
+    Spark.otp_app(resource) ||
+      raise """
+      Must configure otp_app for #{inspect(resource)}. For example:
+
+        use Ash.Resource, otp_app: :my_app
+      """
+  end
+
+  defp file_name(resource, changeset) do
+    {m, f, a} = AshBlog.DataLayer.Info.file_namer(resource)
+    apply(m, f, [changeset | a])
   end
 
   defp put_or_insert_new(table, {pkey, record}, resource) do
@@ -500,44 +584,36 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
-  def destroy(resource, %{data: record} = changeset) do
-    do_destroy(resource, record, changeset.tenant)
-  end
-
-  defp do_destroy(resource, record, tenant) do
-    pkey = Map.take(record, Ash.Resource.Info.primary_key(resource))
-
-    with {:ok, table} <- wrap_or_create_table(resource, tenant),
-         {:ok, _} <- ETS.Set.delete(table, pkey) do
-      :ok
-    else
-      {:error, error} -> {:error, Ash.Error.to_ash_error(error)}
-    end
-  end
-
-  @doc false
-  @impl true
   def update(resource, changeset) do
-    pkey = pkey_map(resource, changeset.data)
-
-    with {:ok, table} <- wrap_or_create_table(resource, changeset.tenant),
-         {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
+    with {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
          {:ok, record} <-
-           do_update(table, {pkey, record}, resource),
+           do_update(changeset, resource),
          {:ok, record} <- cast_record(record, resource) do
-      new_pkey = pkey_map(resource, record)
+      file_path =
+        if folder(resource, record.state) == folder(resource, changeset.data.state) do
+          changeset.data.__metadata__[:ash_blog_file]
+        else
+          new_file_path =
+            Path.join(
+              folder(resource, record.state),
+              Path.basename(changeset.data.__metadata__[:ash_blog_file])
+            )
+            |> expand_path(resource)
 
-      if new_pkey != pkey do
-        case destroy(resource, changeset) do
-          :ok ->
-            {:ok, %{record | __meta__: %Ecto.Schema.Metadata{state: :loaded, schema: resource}}}
+          File.mkdir_p!(Path.dirname(new_file_path))
 
-          {:error, error} ->
-            {:error, Ash.Error.to_ash_error(error)}
+          File.rename!(
+            changeset.data.__metadata__[:ash_blog_file],
+            new_file_path
+          )
+
+          new_file_path
         end
-      else
-        {:ok, %{record | __meta__: %Ecto.Schema.Metadata{state: :loaded, schema: resource}}}
-      end
+
+      {:ok,
+       record
+       |> Ash.Resource.put_metadata(:ash_blog_file, changeset.data.__metadata__[:ash_blog_file])
+       |> Ash.Resource.set_meta(%Ecto.Schema.Metadata{state: :loaded, schema: resource})}
     else
       {:error, error} ->
         {:error, Ash.Error.to_ash_error(error)}
@@ -553,66 +629,90 @@ defmodule AshBlog.DataLayer do
     end)
   end
 
-  defp do_update(table, {pkey, record}, resource) do
+  defp do_update(changeset, resource) do
     attributes = resource |> Ash.Resource.Info.attributes()
 
-    case dump_to_native(record, attributes) do
-      {:ok, casted} ->
-        case ETS.Set.get(table, pkey) do
-          {:ok, {_key, record}} when is_map(record) ->
-            case ETS.Set.put(table, {pkey, Map.merge(record, casted)}) do
-              {:ok, set} ->
-                {_key, record} = ETS.Set.get!(set, pkey)
-                {:ok, record}
+    file_path =
+      changeset.data.__metadata__[:ash_blog_file] ||
+        raise "Missing `ash_blog_file` metadata for record, cannot update!"
 
-              error ->
-                error
-            end
+    with {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
+         recore <-
+           Ash.Resource.set_meta(record, %Ecto.Schema.Metadata{state: :loaded, schema: resource}),
+         {:ok, yaml} <- yaml_frontmatter(record) do
+      File.mkdir_p!(Path.dirname(file_path))
 
-          {:ok, _} ->
-            {:error, "Record not found matching: #{inspect(pkey)}"}
+      File.write!(
+        file_path,
+        """
+        ---
+        #{yaml}
+        ---
+        #{Map.get(record, AshBlog.DataLayer.Info.body_attribute(resource))}
+        """
+      )
 
-          other ->
-            other
-        end
-
-      {:error, error} ->
-        {:error, error}
+      {:ok, Ash.Resource.put_metadata(record, :ash_blog_file, file_path)}
     end
   end
 
   @impl true
-  def transaction(resource, fun, timeout \\ :infinity) do
-    folder = folder(resource)
+  def transaction(resource, fun, _timeout) do
+    tx_identifiers = tx_identifiers(resource)
 
-    :global.trans(
-      {{:csv, folder}, System.unique_integer()},
-      fn ->
-        try do
-          Process.put({:blog_in_transaction, folder}, true)
-          {:res, fun.()}
-        catch
-          {{:csv_rollback, ^folder}, value} ->
+    all_in_transaction(tx_identifiers, fn ->
+      try do
+        fun.()
+      catch
+        {{:blog_rollback, rolled_back_tx_identifiers}, value} = thrown ->
+          if Enum.any?(tx_identifiers, &(&1 in rolled_back_tx_identifiers)) do
             {:error, value}
-        end
+          else
+            throw(thrown)
+          end
+      end
+    end)
+  end
+
+  defp all_in_transaction([], fun) do
+    {:ok, fun.()}
+  end
+
+  defp all_in_transaction([tx_identifier | rest], fun) do
+    :global.trans(
+      {{:blog, tx_identifier}, System.unique_integer()},
+      fn ->
+        Process.put({:blog_in_transaction, tx_identifier}, true)
+        all_in_transaction(rest, fun)
       end,
       [node() | :erlang.nodes()],
-      timeout
+      0
     )
     |> case do
-      {:res, result} -> {:ok, result}
-      {:error, error} -> {:error, error}
       :aborted -> {:error, "transaction failed"}
+      result -> result
     end
   end
 
   @impl true
   def rollback(resource, error) do
-    throw({{:blog_rollback, file(resource)}, error})
+    throw({{:blog_rollback, tx_identifiers(resource)}, error})
   end
 
   @impl true
   def in_transaction?(resource) do
-    Process.get({:blog_in_transaction, file(resource)}, false) == true
+    resource
+    |> tx_identifiers()
+    |> Enum.any?(fn identifier ->
+      Process.get({:blog_in_transaction, identifier}, false) == true
+    end)
+  end
+
+  defp tx_identifiers(resource) do
+    [
+      AshBlog.DataLayer.Info.folder(resource),
+      AshBlog.DataLayer.Info.staging_folder(resource),
+      AshBlog.DataLayer.Info.archive_folder(resource)
+    ]
   end
 end
