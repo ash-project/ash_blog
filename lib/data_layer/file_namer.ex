@@ -1,8 +1,13 @@
 defmodule AshBlog.FileNamer do
+  @moduledoc """
+  The default file namer, uses the current timestamp and the title attribute of the post in the form `YYYY/YYYY-MM-DD-name.md`
+  """
   def name_file(changeset) do
     name =
-      case Ash.Changeset.get_attribute(changeset, :title) ||
-             Ash.Changeset.get_attribute(changeset, :name) do
+      case Ash.Changeset.get_attribute(
+             changeset,
+             AshBlog.DataLayer.Info.title_attribute(changeset.resource)
+           ) do
         nil ->
           nil
 

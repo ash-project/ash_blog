@@ -53,8 +53,4 @@ defmodule AshBlog.DataLayer.Info do
         """
     end
   end
-
-  def full_file_name(resource) do
-    Path.join([folder(resource), file_name(resource)])
-  end
 end

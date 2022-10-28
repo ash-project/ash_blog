@@ -535,25 +535,6 @@ defmodule AshBlog.DataLayer do
     apply(m, f, [changeset | a])
   end
 
-  defp put_or_insert_new(table, {pkey, record}, resource) do
-    attributes = resource |> Ash.Resource.Info.attributes()
-
-    case dump_to_native(record, attributes) do
-      {:ok, casted} ->
-        case ETS.Set.put(table, {pkey, casted}) do
-          {:ok, set} ->
-            {_key, record} = ETS.Set.get!(set, pkey)
-            cast_record(record, resource)
-
-          other ->
-            other
-        end
-
-      other ->
-        other
-    end
-  end
-
   @doc false
   def dump_to_native(record, attributes) do
     Enum.reduce_while(attributes, {:ok, %{}}, fn attribute, {:ok, attrs} ->
@@ -585,8 +566,7 @@ defmodule AshBlog.DataLayer do
   @doc false
   @impl true
   def update(resource, changeset) do
-    with {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
-         {:ok, record} <-
+    with {:ok, record} <-
            do_update(changeset, resource),
          {:ok, record} <- cast_record(record, resource) do
       file_path =
@@ -612,7 +592,7 @@ defmodule AshBlog.DataLayer do
 
       {:ok,
        record
-       |> Ash.Resource.put_metadata(:ash_blog_file, changeset.data.__metadata__[:ash_blog_file])
+       |> Ash.Resource.put_metadata(:ash_blog_file, file_path)
        |> Ash.Resource.set_meta(%Ecto.Schema.Metadata{state: :loaded, schema: resource})}
     else
       {:error, error} ->
@@ -630,14 +610,12 @@ defmodule AshBlog.DataLayer do
   end
 
   defp do_update(changeset, resource) do
-    attributes = resource |> Ash.Resource.Info.attributes()
-
     file_path =
       changeset.data.__metadata__[:ash_blog_file] ||
         raise "Missing `ash_blog_file` metadata for record, cannot update!"
 
     with {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
-         recore <-
+         record <-
            Ash.Resource.set_meta(record, %Ecto.Schema.Metadata{state: :loaded, schema: resource}),
          {:ok, yaml} <- yaml_frontmatter(record) do
       File.mkdir_p!(Path.dirname(file_path))

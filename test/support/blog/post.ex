@@ -1,4 +1,5 @@
 defmodule AshBlog.Test.Post do
+  @moduledoc false
   use Ash.Resource,
     otp_app: :ash_blog,
     data_layer: AshBlog.DataLayer
