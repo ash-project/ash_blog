@@ -6,15 +6,15 @@ defmodule AshBlog.DataLayer.Info do
   alias Spark.Dsl.Extension
 
   def folder(resource) do
-    Extension.get_opt(resource, [:blog], :folder, "static/blog")
+    Extension.get_opt(resource, [:blog], :folder, "blog/published")
   end
 
   def staging_folder(resource) do
-    Extension.get_opt(resource, [:blog], :staging_folder, "blog/staging")
+    Extension.get_opt(resource, [:blog], :staging_folder, "blog/staged")
   end
 
   def archive_folder(resource) do
-    Extension.get_opt(resource, [:blog], :archive_folder, "blog/archive")
+    Extension.get_opt(resource, [:blog], :archive_folder, "blog/archived")
   end
 
   def file_namer(resource) do

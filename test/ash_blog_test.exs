@@ -6,7 +6,6 @@ defmodule AshBlogTest do
   setup do
     on_exit(fn ->
       File.rm_rf!("priv/blog")
-      File.rm_rf!("priv/static/blog")
     end)
 
     :ok
@@ -30,16 +29,16 @@ defmodule AshBlogTest do
       post = Post.create!("first\"", "the body")
       assert %{state: :published} = Post.publish!(post)
       assert [%{state: :published, title: "first\"", body: "the body"}] = Post.read!()
-      assert [_] = Path.wildcard("priv/static/blog/**/*.md")
+      assert [_] = Path.wildcard("priv/blog/**/*.md")
     end
 
     test "blog posts can be archived" do
       post = Post.create!("first\"", "the body")
       assert %{state: :published} = Post.publish!(post)
       assert [%{state: :published, title: "first\"", body: "the body"} = post] = Post.read!()
-      assert [_] = Path.wildcard("priv/static/blog/**/*.md")
+      assert [_] = Path.wildcard("priv/blog/**/*.md")
       assert %{state: :archived} = Post.archive!(post)
-      assert [_] = Path.wildcard("priv/blog/archive/**/*.md")
+      assert [_] = Path.wildcard("priv/blog/archived/**/*.md")
     end
   end
 end

@@ -43,16 +43,23 @@ defmodule AshBlog.DataLayer do
       ],
       folder: [
         type: :string,
-        default: "static/blog",
+        default: "blog/published",
         doc: """
         A path relative to to the priv directory where the files should be placed.
         """
       ],
       staging_folder: [
         type: :string,
-        default: "static/blog",
+        default: "blog/staged",
         doc: """
-        A path relative to to the priv directory where the files should be placed when they are staged.
+        A path relative to to the priv directory where the staged files should be placed when they are staged.
+        """
+      ],
+      archive_folder: [
+        type: :string,
+        default: "blog/archived",
+        doc: """
+        A path relative to to the priv directory where the archived files should be placed when they are staged.
         """
       ]
     ]
