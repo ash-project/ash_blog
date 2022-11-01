@@ -8,16 +8,26 @@ defmodule AshBlog do
   def rss_feed(blog_posts, opts \\ []) do
     blog_posts = Enum.filter(blog_posts, &(&1.state == :published))
 
+    default_updated =
+      blog_posts
+      |> Enum.map(& &1.published_at)
+      |> case do
+        [] ->
+          DateTime.utc_now()
+
+        rows ->
+          Enum.max(rows, DateTime)
+      end
+
     element(
       :feed,
       %{xmlns: "http://www.w3.org/2005/Atom"},
       [
-        element(:title, "Ash Framework Blog"),
-        element(:link, "https://ash-hq.org/blog"),
-        element(
-          :description,
-          "News and information about Ash Framework, a declarative, resource oriented Elixir application development framework."
-        )
+        element(:id, opts[:link]),
+        element(:title, opts[:title]),
+        element(:link, %{href: opts[:link], rel: "alternate", type: "text/html"}),
+        element(:link, %{href: opts[:rss_link], rel: "self", type: "application/atom+xml"}),
+        element(:updated, to_string(opts[:updated] || default_updated))
       ] ++
         Enum.map(blog_posts, fn %resource{} = blog_post ->
           data = [
@@ -60,7 +70,7 @@ defmodule AshBlog do
               |> Enum.map_join("-", &to_string(Map.get(blog_post, &1)))
             )
 
-          element(:item, data, inners)
+          element(:entry, data, inners)
         end)
     )
     |> XmlBuilder.generate()
