@@ -8,9 +8,11 @@ defmodule AshBlog do
   def rss_feed(blog_posts, opts \\ []) do
     blog_posts = Enum.filter(blog_posts, &(&1.state == :published))
 
-    default_updated =
+    updated = opts[:updated] || fn blog_post -> blog_post.published_at end
+
+    last_updated =
       blog_posts
-      |> Enum.map(& &1.published_at)
+      |> Enum.map(updated)
       |> case do
         [] ->
           DateTime.utc_now()
@@ -27,25 +29,34 @@ defmodule AshBlog do
         element(:title, opts[:title]),
         element(:link, %{href: opts[:link], rel: "alternate", type: "text/html"}),
         element(:link, %{href: opts[:rss_link], rel: "self", type: "application/atom+xml"}),
-        element(:updated, to_string(opts[:updated] || default_updated))
+        element(:updated, DateTime.to_iso8601(last_updated))
       ] ++
         Enum.map(blog_posts, fn %resource{} = blog_post ->
-          data = [
-            title: Map.get(blog_post, AshBlog.DataLayer.Info.title_attribute(resource))
+          inners = [
+            element(
+              :id,
+              Ash.Resource.Info.primary_key(resource)
+              |> Enum.map_join("-", &to_string(Map.get(blog_post, &1)))
+            ),
+            element(:title, Map.get(blog_post, AshBlog.DataLayer.Info.title_attribute(resource))),
+            element(:updated, DateTime.to_iso8601(updated.(blog_post)))
           ]
 
-          data =
+          inners =
             if opts[:linker] do
-              Keyword.put(data, :link, opts[:linker].(blog_post))
+              [element(:link, %{rel: "alternate", href: opts[:linker].(blog_post)}) | inners]
             else
-              data
+              inners
             end
 
           inners =
             if opts[:html_body] do
-              [element(:content, %{type: "html"}, {:cdata, opts[:html_body].(blog_post)})]
+              [
+                element(:content, %{type: "html"}, {:cdata, opts[:html_body].(blog_post)})
+                | inners
+              ]
             else
-              []
+              inners
             end
 
           inners =
@@ -62,15 +73,7 @@ defmodule AshBlog do
               inners
             end
 
-          data =
-            Keyword.put(
-              data,
-              :id,
-              Ash.Resource.Info.primary_key(resource)
-              |> Enum.map_join("-", &to_string(Map.get(blog_post, &1)))
-            )
-
-          element(:entry, data, inners)
+          element(:entry, inners)
         end)
     )
     |> XmlBuilder.generate()
