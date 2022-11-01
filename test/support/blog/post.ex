@@ -5,7 +5,7 @@ defmodule AshBlog.Test.Post do
     data_layer: AshBlog.DataLayer
 
   actions do
-    defaults [:create, :read]
+    defaults [:create, :read, :update]
   end
 
   attributes do

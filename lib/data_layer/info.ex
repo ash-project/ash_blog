@@ -29,6 +29,10 @@ defmodule AshBlog.DataLayer.Info do
     Extension.get_opt(resource, [:blog], :body_attribute, :body)
   end
 
+  def slug_attribute(resource) do
+    Extension.get_opt(resource, [:blog], :slug_attribute, :slug)
+  end
+
   def title_attribute(resource) do
     Extension.get_opt(resource, [:blog], :title_attribute, :title)
   end

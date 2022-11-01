@@ -24,6 +24,13 @@ defmodule AshBlogTest do
     end
   end
 
+  describe "slug" do
+    test "a slug is auto generated" do
+      Post.create!("first", "the body") |> IO.inspect()
+      Post.read!()
+    end
+  end
+
   describe "updating blog posts" do
     test "blog posts can be published" do
       post = Post.create!("first\"", "the body")

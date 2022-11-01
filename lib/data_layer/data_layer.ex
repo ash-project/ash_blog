@@ -41,6 +41,12 @@ defmodule AshBlog.DataLayer do
         doc:
           "The attribute name to use for the body of the post. Wil be created if it doesn't exist."
       ],
+      slug_attribute: [
+        type: :atom,
+        default: :slug,
+        doc:
+          "The attribute name to use for the slug. All past slugs will be stored and used when looking up by slug."
+      ],
       folder: [
         type: :string,
         default: "blog/published",
@@ -468,7 +474,9 @@ defmodule AshBlog.DataLayer do
     |> Ash.Resource.Info.attributes()
     |> Enum.reject(&(&1.name == body_attribute))
     |> Enum.reduce_while({:ok, []}, fn attr, {:ok, acc} ->
-      if Ash.Type.storage_type(attr.type) in [
+      storage_type = Ash.Type.storage_type(unwrap_array(attr.type))
+
+      if storage_type in [
            :string,
            :integer,
            :uuid,
@@ -483,7 +491,9 @@ defmodule AshBlog.DataLayer do
             {:halt, {:error, error}}
         end
       else
-        {:halt, {:error, "#{inspect(attr.type)} is not yet supported by `AshBlog.DataLayer`"}}
+        {:halt,
+         {:error,
+          "#{inspect(attr.type)} with storage type #{inspect(storage_type)} is not yet supported by `AshBlog.DataLayer`"}}
       end
     end)
     |> case do
@@ -492,22 +502,41 @@ defmodule AshBlog.DataLayer do
          attrs
          |> Enum.reverse()
          |> Enum.map_join("\n", fn {name, value} ->
-           case value do
-             value when is_binary(value) ->
-               "#{name}: '#{escape_string(value)}'"
-
-             %DateTime{} = value ->
-               "#{name}: '#{escape_string(value)}'"
-
-             other ->
-               "#{name}: #{other}"
-           end
+           "#{name}: #{encode(value)}"
          end)}
 
       {:error, error} ->
         {:error, error}
     end
   end
+
+  def encode(value, indentation \\ 2) do
+    case value do
+      value when is_binary(value) ->
+        "'#{escape_string(value)}'"
+
+      %DateTime{} = value ->
+        "'#{escape_string(value)}'"
+
+      [] ->
+        "[]"
+
+      list when is_list(value) ->
+        "\n#{listify(list, indentation)}"
+
+      other ->
+        to_string(other)
+    end
+  end
+
+  def listify(value, indentation \\ 2) do
+    Enum.map_join(value, "\n", fn value ->
+      "#{String.duplicate(" ", indentation)}- #{encode(value, indentation + 2)}"
+    end)
+  end
+
+  defp unwrap_array({:array, value}), do: unwrap_array(value)
+  defp unwrap_array(value), do: value
 
   defp escape_string(value) do
     value
@@ -647,7 +676,7 @@ defmodule AshBlog.DataLayer do
 
     all_in_transaction(tx_identifiers, fn ->
       try do
-        fun.()
+        {:ok, fun.()}
       catch
         {{:blog_rollback, rolled_back_tx_identifiers}, value} = thrown ->
           if Enum.any?(tx_identifiers, &(&1 in rolled_back_tx_identifiers)) do
@@ -660,7 +689,7 @@ defmodule AshBlog.DataLayer do
   end
 
   defp all_in_transaction([], fun) do
-    {:ok, fun.()}
+    fun.()
   end
 
   defp all_in_transaction([tx_identifier | rest], fun) do
