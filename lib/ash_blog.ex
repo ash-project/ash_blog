@@ -32,19 +32,25 @@ defmodule AshBlog do
         element(:updated, DateTime.to_iso8601(last_updated))
       ] ++
         Enum.map(blog_posts, fn %resource{} = blog_post ->
+          link =
+            if opts[:linker] do
+              opts[:linker].(blog_post)
+            end
+
           inners = [
             element(
               :id,
-              Ash.Resource.Info.primary_key(resource)
-              |> Enum.map_join("-", &to_string(Map.get(blog_post, &1)))
+              link ||
+                Ash.Resource.Info.primary_key(resource)
+                |> Enum.map_join("-", &to_string(Map.get(blog_post, &1)))
             ),
             element(:title, Map.get(blog_post, AshBlog.DataLayer.Info.title_attribute(resource))),
             element(:updated, DateTime.to_iso8601(updated.(blog_post)))
           ]
 
           inners =
-            if opts[:linker] do
-              [element(:link, %{rel: "alternate", href: opts[:linker].(blog_post)}) | inners]
+            if link do
+              [element(:link, %{rel: "alternate", href: link}) | inners]
             else
               inners
             end
