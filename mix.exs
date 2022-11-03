@@ -109,8 +109,7 @@ defmodule AshBlog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # {:ash, github: "ash-project/ash"},
-      {:ash, path: "../ash"},
+      {:ash, "~> 2.4"},
       {:yaml_elixir, "~> 2.9"},
       {:xml_builder, "~> 2.2"},
 
