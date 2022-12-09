@@ -671,7 +671,7 @@ defmodule AshBlog.DataLayer do
   end
 
   @impl true
-  def transaction(resource, fun, _timeout) do
+  def transaction(resource, fun, _timeout, _) do
     tx_identifiers = tx_identifiers(resource)
 
     all_in_transaction(tx_identifiers, fn ->
