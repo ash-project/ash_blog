@@ -257,7 +257,7 @@ defmodule AshBlog.DataLayer do
                public?: false
              }) do
           {:ok, expression} ->
-            case Ash.Filter.Runtime.do_match(record, expression) do
+            case Ash.Expr.eval_hydrated(expression, record: record) do
               {:ok, value} ->
                 if calculation.load do
                   {:cont, {:ok, Map.put(record, calculation.load, value)}}
@@ -300,6 +300,7 @@ defmodule AshBlog.DataLayer do
     end
   end
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp get_records(resource) do
     published =
       resource
@@ -426,6 +427,7 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
+  # sobelow_skip ["Traversal.FileModule"]
   def create(resource, changeset) do
     file_name = file_name(resource, changeset)
 
@@ -601,6 +603,7 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
+  # sobelow_skip ["Traversal.FileModule"]
   def update(resource, changeset) do
     with {:ok, record} <-
            do_update(changeset, resource),
@@ -645,6 +648,7 @@ defmodule AshBlog.DataLayer do
     end)
   end
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp do_update(changeset, resource) do
     file_path =
       changeset.data.__metadata__[:ash_blog_file] ||

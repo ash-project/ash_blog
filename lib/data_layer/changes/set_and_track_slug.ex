@@ -1,4 +1,5 @@
 defmodule AshBlog.DataLayer.Changes.SetAndTrackSlug do
+  @moduledoc false
   use Ash.Resource.Change
 
   def change(changeset, _, _) do

@@ -38,7 +38,7 @@ defmodule AshBlog.DataLayer.Info do
   end
 
   def file_name(%resource{} = record) do
-    {mod, fun, args} = file_name(resource)
+    {mod, fun, args} = file_namer(resource)
 
     case apply(mod, fun, [record | args]) do
       {:ok, value} ->

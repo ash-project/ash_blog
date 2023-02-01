@@ -109,19 +109,19 @@ defmodule AshBlog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ash, "~> 2.4"},
+      {:ash, "~> 2.5"},
       {:yaml_elixir, "~> 2.9"},
       {:xml_builder, "~> 2.2"},
 
       # dev/test dependencies
       {:elixir_sense,
        github: "elixir-lsp/elixir_sense", ref: "85d4a87d", only: [:dev, :test, :docs]},
-      {:ex_doc, "~> 0.22", only: :dev, runtime: false},
-      {:ex_check, "~> 0.12.0", only: :dev},
-      {:credo, ">= 0.0.0", only: :dev, runtime: false},
-      {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
-      {:sobelow, ">= 0.0.0", only: :dev, runtime: false},
-      {:git_ops, "~> 2.0.1", only: :dev},
+      {:ex_doc, "~> 0.22", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.12.0", only: [:dev, :test]},
+      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.0.1", only: [:dev, :test]},
       {:excoveralls, "~> 0.13.0", only: [:dev, :test]}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}

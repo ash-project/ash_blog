@@ -1,4 +1,5 @@
 defmodule AshBlog.DataLayer.Transformers.AddStructure do
+  @moduledoc false
   use Spark.Dsl.Transformer
 
   alias AshBlog.DataLayer.Info

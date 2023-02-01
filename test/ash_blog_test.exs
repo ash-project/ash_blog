@@ -26,7 +26,7 @@ defmodule AshBlogTest do
 
   describe "slug" do
     test "a slug is auto generated" do
-      Post.create!("first", "the body") |> IO.inspect()
+      Post.create!("first", "the body")
       Post.read!()
     end
   end
