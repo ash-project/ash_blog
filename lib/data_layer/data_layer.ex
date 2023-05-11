@@ -333,7 +333,7 @@ defmodule AshBlog.DataLayer do
             resource
             |> Ash.Resource.Info.attributes()
             |> Map.new(fn attr ->
-              {attr.name, Map.get(result, to_string(attr.name))}
+              {attr.name, decode_formatting_hacks(Map.get(result, to_string(attr.name)))}
             end)
             |> Map.put(AshBlog.DataLayer.Info.body_attribute(resource), body)
 
@@ -374,6 +374,19 @@ defmodule AshBlog.DataLayer do
         {:error, error}
     end
   end
+
+  defp decode_formatting_hacks(value) when is_list(value) do
+    Enum.map(value, &decode_formatting_hacks/1)
+  end
+
+  defp decode_formatting_hacks(value) when is_binary(value) do
+    # I hate this more than words can describe
+    value
+    |> String.replace("__ash_blog_single_quote_hack__", ",")
+    |> String.replace("__ash_blog_newline_hack__", "\n")
+  end
+
+  defp decode_formatting_hacks(value), do: value
 
   @doc false
   def cast_record(record, resource) do
@@ -543,7 +556,8 @@ defmodule AshBlog.DataLayer do
   defp escape_string(value) do
     value
     |> to_string()
-    |> String.replace("'", "\\'")
+    |> String.replace("'", "__ash_blog_single_quote_hack__")
+    |> String.replace("\n", "__ash_blog_newline_hack__")
   end
 
   case Code.ensure_compiled(Mix) do
