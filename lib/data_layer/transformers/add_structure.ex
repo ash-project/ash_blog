@@ -8,25 +8,31 @@ defmodule AshBlog.DataLayer.Transformers.AddStructure do
     dsl_state
     |> Ash.Resource.Builder.add_new_create_timestamp(Info.created_at_attribute(dsl_state))
     |> Ash.Resource.Builder.add_new_attribute(Info.title_attribute(dsl_state), :string,
+      public?: true,
       allow_nil?: false
     )
     |> Ash.Resource.Builder.add_new_attribute(Info.slug_attribute(dsl_state), :string,
+      public?: true,
       allow_nil?: false
     )
     |> Ash.Resource.Builder.add_new_attribute(:past_slugs, {:array, :string},
+      public?: true,
       allow_nil?: false,
       default: [],
       writable?: false
     )
     |> Ash.Resource.Builder.add_new_attribute(Info.body_attribute(dsl_state), :string,
+      public?: true,
       allow_nil?: false
     )
     |> Ash.Resource.Builder.add_new_attribute(:state, :atom,
+      public?: true,
       constraints: [one_of: [:staged, :published, :archived]],
       default: :staged,
       writable?: false
     )
-    |> Ash.Resource.Builder.add_new_attribute(:published_at, :utc_datetime_usec, writable?: false)
+
+    |> Ash.Resource.Builder.add_new_attribute(:published_at, :utc_datetime_usec, writable?: false, public?: true)
     |> Ash.Resource.Builder.add_change(AshBlog.DataLayer.Changes.SetAndTrackSlug,
       on: [:create, :update]
     )

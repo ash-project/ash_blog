@@ -1,10 +1,12 @@
 defmodule AshBlog.Test.Post do
   @moduledoc false
   use Ash.Resource,
+    domain: AshBlog.Test.Domain,
     otp_app: :ash_blog,
     data_layer: AshBlog.DataLayer
 
   actions do
+    default_accept :*
     defaults [:create, :read, :update]
   end
 
@@ -13,7 +15,6 @@ defmodule AshBlog.Test.Post do
   end
 
   code_interface do
-    define_for AshBlog.Test.Api
     define :create, args: [:title, :body]
     define :read, action: :read
     define :stage, action: :stage

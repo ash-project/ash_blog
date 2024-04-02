@@ -101,7 +101,7 @@ defmodule AshBlog.DataLayer do
       :filter,
       :limit,
       :sort,
-      :api,
+      :domain,
       calculations: [],
       relationships: %{},
       offset: 0
@@ -135,10 +135,10 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
-  def resource_to_query(resource, api) do
+  def resource_to_query(resource, domain) do
     %Query{
       resource: resource,
-      api: api
+      domain: domain
     }
   end
 
@@ -178,13 +178,13 @@ defmodule AshBlog.DataLayer do
 
   @doc false
   @impl true
-  def run_aggregate_query(%{api: api} = query, aggregates, resource) do
+  def run_aggregate_query(%{domain: domain} = query, aggregates, resource) do
     case run_query(query, resource) do
       {:ok, results} ->
         Enum.reduce_while(aggregates, {:ok, %{}}, fn
           %{kind: :count, name: name, query: query}, {:ok, acc} ->
             results
-            |> filter_matches(Map.get(query || %{}, :filter), api)
+            |> filter_matches(Map.get(query || %{}, :filter), domain)
             |> case do
               {:ok, matches} ->
                 {:cont, {:ok, Map.put(acc, name, Enum.count(matches))}}
@@ -219,13 +219,13 @@ defmodule AshBlog.DataLayer do
           limit: limit,
           sort: sort,
           calculations: calculations,
-          api: api
+          domain: domain
         },
         _resource
       ) do
     with {:ok, records} <- get_records(resource),
          {:ok, records} <-
-           filter_matches(records, filter, api),
+           filter_matches(records, filter, domain),
          {:ok, records} <-
            do_add_calculations(records, resource, calculations) do
       offset_records =
@@ -432,10 +432,10 @@ defmodule AshBlog.DataLayer do
     Path.wildcard(Path.join([expand_path(folder, resource), "**", "*.md"]))
   end
 
-  defp filter_matches(records, nil, _api), do: {:ok, records}
+  defp filter_matches(records, nil, _domain), do: {:ok, records}
 
-  defp filter_matches(records, filter, api) do
-    Ash.Filter.Runtime.filter_matches(api, records, filter)
+  defp filter_matches(records, filter, domain) do
+    Ash.Filter.Runtime.filter_matches(domain, records, filter)
   end
 
   @doc false

@@ -1,6 +1,6 @@
-defmodule AshBlog.Test.Api do
+defmodule AshBlog.Test.Domain do
   @moduledoc false
-  use Ash.Api
+  use Ash.Domain
 
   resources do
     allow_unregistered? true

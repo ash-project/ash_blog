@@ -33,53 +33,13 @@ defmodule AshBlog.MixProject do
     ["lib"]
   end
 
-  defp extras() do
-    "documentation/**/*.md"
-    |> Path.wildcard()
-    |> Enum.map(fn path ->
-      title =
-        path
-        |> Path.basename(".md")
-        |> String.split(~r/[-_]/)
-        |> Enum.map(&String.capitalize/1)
-        |> Enum.join(" ")
-        |> case do
-          "F A Q" ->
-            "FAQ"
-
-          other ->
-            other
-        end
-
-      {String.to_atom(path),
-       [
-         title: title
-       ]}
-    end)
-  end
-
-  defp groups_for_extras() do
-    "documentation/*"
-    |> Path.wildcard()
-    |> Enum.map(fn folder ->
-      name =
-        folder
-        |> Path.basename()
-        |> String.split(~r/[-_]/)
-        |> Enum.map(&String.capitalize/1)
-        |> Enum.join(" ")
-
-      {name, folder |> Path.join("**") |> Path.wildcard()}
-    end)
-  end
-
   defp docs do
     [
       main: "AshBlog",
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
-      extras: extras(),
-      groups_for_extras: groups_for_extras(),
+      extras: [],
+      groups_for_extras: [],
       groups_for_modules: [
         "Resource DSL": ~r/AshGraphql.Resource/,
         "Api DSL": ~r/AshGraphql.Api/
@@ -109,20 +69,18 @@ defmodule AshBlog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ash, "~> 2.5"},
+      {:ash, "~> 3.0.0-rc.7"},
       {:yaml_elixir, "~> 2.9"},
       {:xml_builder, "~> 2.2"},
 
       # dev/test dependencies
-      {:elixir_sense,
-       github: "elixir-lsp/elixir_sense", ref: "85d4a87d", only: [:dev, :test, :docs]},
       {:ex_doc, "~> 0.22", only: [:dev, :test], runtime: false},
-      {:ex_check, "~> 0.12.0", only: [:dev, :test]},
+      {:ex_check, "~> 0.12", only: [:dev, :test]},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
-      {:git_ops, "~> 2.0.1", only: [:dev, :test]},
-      {:excoveralls, "~> 0.13.0", only: [:dev, :test]}
+      {:git_ops, "~> 2.0", only: [:dev, :test]},
+      {:excoveralls, "~> 0.13", only: [:dev, :test]}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
