@@ -69,7 +69,7 @@ defmodule AshBlog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ash, "~> 3.0.0-rc.7"},
+      {:ash, "~> 3.0"},
       {:yaml_elixir, "~> 2.9"},
       {:xml_builder, "~> 2.2"},
 
