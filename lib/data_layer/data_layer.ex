@@ -493,6 +493,7 @@ defmodule AshBlog.DataLayer do
 
       if storage_type in [
            :string,
+           :ci_string,
            :integer,
            :uuid,
            :utc_datetime,
