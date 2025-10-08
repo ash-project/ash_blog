@@ -31,8 +31,10 @@ defmodule AshBlog.DataLayer.Transformers.AddStructure do
       default: :staged,
       writable?: false
     )
-
-    |> Ash.Resource.Builder.add_new_attribute(:published_at, :utc_datetime_usec, writable?: false, public?: true)
+    |> Ash.Resource.Builder.add_new_attribute(:published_at, :utc_datetime_usec,
+      writable?: false,
+      public?: true
+    )
     |> Ash.Resource.Builder.add_change(AshBlog.DataLayer.Changes.SetAndTrackSlug,
       on: [:create, :update]
     )
