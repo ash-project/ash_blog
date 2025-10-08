@@ -69,6 +69,8 @@ defmodule AshBlog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:sourceror, "~> 1.0", only: [:dev, :test]},
+      {:igniter, "~> 0.6", only: [:dev, :test]},
       {:ash, "~> 3.0"},
       {:yaml_elixir, "~> 2.9"},
       {:xml_builder, "~> 2.2"},
@@ -90,7 +92,7 @@ defmodule AshBlog.MixProject do
     [
       sobelow: "sobelow --skip",
       credo: "credo --strict",
-      docs: ["docs", "ash.replace_doc_links"],
+      docs: ["docs", "spark.replace_doc_links"],
       "spark.formatter": "spark.formatter --extensions AshBlog.DataLayer"
     ]
   end
