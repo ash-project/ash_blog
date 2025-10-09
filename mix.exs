@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
+
 defmodule AshBlog.MixProject do
   use Mix.Project
 
@@ -49,12 +53,19 @@ defmodule AshBlog.MixProject do
 
   defp package do
     [
-      name: :ash_blog,
+      maintainers: [
+        "Zach Daniel <zach@zachdaniel.dev>"
+      ],
       licenses: ["MIT"],
       files: ~w(lib .formatter.exs mix.exs README* LICENSE*
       CHANGELOG* documentation),
       links: %{
-        GitHub: "https://github.com/ash-project/ash_blog"
+        "GitHub" => "https://github.com/ash-project/ash_blog",
+        "Discord" => "https://discord.gg/HTHRaaVPUc",
+        "Website" => "https://ash-hq.org",
+        "Forum" => "https://elixirforum.com/c/ash-framework-forum/",
+        "Changelog" => "https://github.com/ash-project/ash_blog/blob/main/CHANGELOG.md",
+        "REUSE Compliance" => "https://api.reuse.software/info/github.com/ash-project/ash_blog"
       }
     ]
   end
@@ -82,7 +93,8 @@ defmodule AshBlog.MixProject do
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.0", only: [:dev, :test]},
-      {:excoveralls, "~> 0.13", only: [:dev, :test]}
+      {:excoveralls, "~> 0.13", only: [:dev, :test]},
+      {:mix_audit, "~> 2.1", only: [:dev, :test]}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

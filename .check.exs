@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
+
 [
   ## all available options with default values (see `mix check` docs for description)
   # parallel: true,
@@ -16,7 +20,8 @@
 
     ## ...or reconfigured (e.g. disable parallel execution of ex_unit in umbrella)
     # {:ex_unit, umbrella: [parallel: false]},
-    {:check_formatter, command: "mix spark.formatter --check"}
+    {:check_formatter, command: "mix spark.formatter --check"},
+    {:reuse, command: ["pipx", "run", "reuse", "lint", "-q"]}
 
     ## custom new tools may be added (Mix tasks or arbitrary commands)
     # {:my_task, "mix my_task", env: %{"MIX_ENV" => "prod"}},
