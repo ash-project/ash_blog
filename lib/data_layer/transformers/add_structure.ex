@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
+
 defmodule AshBlog.DataLayer.Transformers.AddStructure do
   @moduledoc false
   use Spark.Dsl.Transformer

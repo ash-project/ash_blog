@@ -1,11 +1,18 @@
-name: CI
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
 
+name: CI
 on:
   push:
     tags:
       - "v*"
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_call:
 jobs:
   ash-ci:
     uses: ash-project/ash/.github/workflows/ash-ci.yml@main
+    with:
+      reuse: true

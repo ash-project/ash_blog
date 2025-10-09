@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
+
 defmodule AshBlog.DataLayer.Info do
   @moduledoc """
   Introspection helpers for the AshBlog data layer.

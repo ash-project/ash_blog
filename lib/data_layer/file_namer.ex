@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Zach Daniel
+#
+# SPDX-License-Identifier: MIT
+
 defmodule AshBlog.FileNamer do
   @moduledoc """
   The default file namer, uses the current timestamp and the title attribute of the post in the form `YYYY/YYYY-MM-DD-name.md`
